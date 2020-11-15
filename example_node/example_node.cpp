@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 
     // MissionElement* state_monitor = new StateMonitor();
 
-    MissionElement* set_restricted_norm_settings = new SetRestNormSettings(true, false, 10); 
+    MissionElement* set_restricted_norm_settings = new SetRestNormSettings(true, false, .5); 
 
     MissionElement* land_set_rest_norm_settings = new SetRestNormSettings(true, false, 0.15);
     MissionElement* waypoint_set_rest_norm_settings = new SetRestNormSettings(true, false, 0.40); 

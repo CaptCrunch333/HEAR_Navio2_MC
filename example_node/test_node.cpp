@@ -1,4 +1,4 @@
-//TODO: Check again the whole naming and archeticting of SetRelativeWaypoint and SetAbsoluteWaypoint
+//TODO: Check again the whole naming and archeticting of SetRelativeWaypoint and SetAbsoluteWaypoint.
 #include <iostream>
 
 #include "HEAR_core/std_logger.hpp"

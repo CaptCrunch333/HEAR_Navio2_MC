@@ -12,25 +12,18 @@
 #include "HEAR_mission/SetHeightOffset.hpp"
 #include "HEAR_mission/ResetController.hpp"
 #include "HEAR_mission/SetRelativeWaypoint.hpp"
+#include "HEAR_mission/SwitchTrigger.hpp"
 #include "HEAR_mission/SetAbsoluteWaypoint.hpp"
 #include "HEAR_mission/UpdateController.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_UpdateControllerClnt.hpp"
-//
-#include "HEAR_ROS_BRIDGE/ROSUnit_UpdateControllerSrv.hpp"
 #include "HEAR_control/PIDController.hpp"
-//
-#include "HEAR_ROS_BRIDGE/ROSUnit_OrientationSubscriber.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_InfoSubscriber.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_Factory.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_RestNormSettingsClnt.hpp"
-#include "HEAR_ROS_BRIDGE/ROSUnit_ControlOutputSubscriber.hpp"
 
-// #include "ChangeInternalState.hpp"
-// #include "InternalSystemStateCondition.hpp"
-// #include "StateMonitor.hpp"
+#define Z_ONLY
 
-#define TESTING
-#define BIG_HEXA
+
 int main(int argc, char** argv) {
     Logger::assignLogger(new StdLogger());
 
@@ -46,6 +39,13 @@ int main(int argc, char** argv) {
     ROSUnit* ros_arm_srv = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
                                                             ROSUnit_msg_type::ROSUnit_Bool, 
                                                             "arm");
+
+    #ifdef Z_ONLY
+    ROSUnit* ros_optitrack_mrft_switch_z = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
+                                                                      ROSUnit_msg_type::ROSUnit_Float,
+                                                                      "optitrack_mrft_switch_z");
+    #endif
+
     ROSUnit* ros_pos_sub = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Subscriber,
                                                             ROSUnit_msg_type::ROSUnit_Point,
                                                             "global2inertial/position");
@@ -74,6 +74,12 @@ int main(int argc, char** argv) {
     MissionElement* update_controller_pid_yaw = new UpdateController();
     MissionElement* update_controller_pid_yaw_rate = new UpdateController();
 
+    #ifdef Z_ONLY
+    MissionElement* update_controller_mrft_z = new UpdateController();
+    MissionElement* pid_to_mrft_switch_z=new SwitchTrigger(3);
+    MissionElement* mrft_to_pid_switch_z=new SwitchTrigger(1);
+    #endif
+
     MissionElement* reset_z = new ResetController();
 
     MissionElement* arm_motors = new Arm();
@@ -86,24 +92,13 @@ int main(int argc, char** argv) {
     MissionElement* set_restricted_norm_settings = new SetRestNormSettings(true, false, .5); 
 
     MissionElement* land_set_rest_norm_settings = new SetRestNormSettings(true, false, 0.15);
-    MissionElement* waypoint_set_rest_norm_settings = new SetRestNormSettings(true, false, 0.40); 
 
     MissionElement* set_height_offset = new SetHeightOffset(); 
     MissionElement* initial_pose_waypoint = new SetRelativeWaypoint(0., 0., 0., 0.); //TODO: SetRelativeWaypoint needs substantial refactoring
-    
-    #ifdef TESTING
-    MissionElement* takeoff_relative_waypoint = new SetRelativeWaypoint(0., 0., 1.0, 0.);
-    #endif
 
-    //MissionElement* absolute_zero_Z_relative_waypoint = new SetRelativeWaypoint(0., 0., -10, 0.); 
-    MissionElement* absolute_origin_1m_height = new SetAbsoluteWaypoint(0, 0, 1, 0);
-    MissionElement* absolute_waypoint_square_1 = new SetAbsoluteWaypoint(1.5, 0., 1.0, 0.);
-    MissionElement* absolute_waypoint_square_2 = new SetAbsoluteWaypoint(1.5, 1.5, 1.0, 0.);
-    MissionElement* absolute_waypoint_square_3 = new SetAbsoluteWaypoint(-1.5, 1.5, 1.0, 0.);
-    MissionElement* absolute_waypoint_square_4 = new SetAbsoluteWaypoint(-1.5, -1.5, 1.0, 0.);
-    MissionElement* absolute_waypoint_square_5 = new SetAbsoluteWaypoint(1.5, -1.5, 1.0, 0.);
-    MissionElement* absolute_waypoint_square_6 = new SetAbsoluteWaypoint(1.5, 0.0, 1.0, 0.);
-    MissionElement* absolute_waypoint_square_7 = new SetAbsoluteWaypoint(0.0, 0.0, 1.0, 0.);
+   
+    MissionElement* takeoff_relative_waypoint = new SetRelativeWaypoint(0., 0., 1.5, 0.);
+
     MissionElement* land_relative_waypoint = new SetRelativeWaypoint(0., 0., -2., 0.);
 
     //******************Connections***************
@@ -115,6 +110,13 @@ int main(int argc, char** argv) {
     update_controller_pid_yaw->getPorts()[(int)UpdateController::ports_id::OP_0]->connect((ros_updt_ctr)->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_0_PID]);
     update_controller_pid_yaw_rate->getPorts()[(int)UpdateController::ports_id::OP_0]->connect((ros_updt_ctr)->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_0_PID]);
 
+    #ifdef Z_ONLY
+    update_controller_mrft_z->getPorts()[(int)UpdateController::ports_id::OP_0]->connect(ros_updt_ctr->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_1_MRFT]);
+    pid_to_mrft_switch_z->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_z)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
+    mrft_to_pid_switch_z->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_z)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
+ 
+    #endif
+   
     ros_pos_sub->getPorts()[(int)ROSUnit_PointSub::ports_id::OP_0]->connect(initial_pose_waypoint->getPorts()[(int)SetRelativeWaypoint::ports_id::IP_0]);
     rosunit_yaw_provider->getPorts()[(int)ROSUnit_PointSub::ports_id::OP_1]->connect(initial_pose_waypoint->getPorts()[(int)SetRelativeWaypoint::ports_id::IP_1]);
     
@@ -135,89 +137,17 @@ int main(int argc, char** argv) {
 
     set_restricted_norm_settings->getPorts()[(int)SetRestNormSettings::ports_id::OP_0]->connect(ros_restnorm_settings->getPorts()[(int)ROSUnit_RestNormSettingsClnt::ports_id::IP_0]);
     land_set_rest_norm_settings->getPorts()[(int)SetRestNormSettings::ports_id::OP_0]->connect(ros_restnorm_settings->getPorts()[(int)ROSUnit_RestNormSettingsClnt::ports_id::IP_0]);
-    waypoint_set_rest_norm_settings->getPorts()[(int)SetRestNormSettings::ports_id::OP_0]->connect(ros_restnorm_settings->getPorts()[(int)ROSUnit_RestNormSettingsClnt::ports_id::IP_0]);
-    
+      
     set_height_offset->getPorts()[(int)SetHeightOffset::ports_id::OP_0]->connect(ros_set_height_offset->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
     initial_pose_waypoint->getPorts()[(int)SetRelativeWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
     takeoff_relative_waypoint->getPorts()[(int)SetRelativeWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
+
+
     //absolute_zero_Z_relative_waypoint->connect(ros_set_path_clnt);
-    absolute_origin_1m_height->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_1->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_2->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_3->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_4->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_5->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_6->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
-    absolute_waypoint_square_7->getPorts()[(int)SetAbsoluteWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
     land_relative_waypoint->getPorts()[(int)SetRelativeWaypoint::ports_id::OP_0]->connect(ros_set_path_clnt->getPorts()[(int)ROSUnit_SetPosesClnt::ports_id::IP_0]);
 
     //*************Setting Flight Elements*************
-    #ifdef SMALL_HEXA
-    ((UpdateController*)update_controller_pid_x)->pid_data.kp = 0.696435; //0.51639 * 0.8;
-    ((UpdateController*)update_controller_pid_x)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_x)->pid_data.kd = 0.375166; //0.21192 * 0.8;
-    ((UpdateController*)update_controller_pid_x)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_x)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_x)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_x)->pid_data.dt = (float)1.0/120.0;
-    ((UpdateController*)update_controller_pid_x)->pid_data.id = block_id::PID_X;
 
-    ((UpdateController*)update_controller_pid_y)->pid_data.kp = 0.568331;// 0.51639 * 0.8;
-    ((UpdateController*)update_controller_pid_y)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_y)->pid_data.kd =  0.306157;// * 0.8;
-    ((UpdateController*)update_controller_pid_y)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_y)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_y)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_y)->pid_data.dt = (float)1.0/120.0;
-    ((UpdateController*)update_controller_pid_y)->pid_data.id = block_id::PID_Y;
-
-    ((UpdateController*)update_controller_pid_z)->pid_data.kp = 0.730936; 
-    ((UpdateController*)update_controller_pid_z)->pid_data.ki = 0.0980*2; 
-    ((UpdateController*)update_controller_pid_z)->pid_data.kd = 0.190225; 
-    ((UpdateController*)update_controller_pid_z)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_z)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_z)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_z)->pid_data.dt = (float)1.0/120.0;
-    ((UpdateController*)update_controller_pid_z)->pid_data.id = block_id::PID_Z;
-
-    ((UpdateController*)update_controller_pid_roll)->pid_data.kp = 0.2121; //0.172195; //0.3302; //0.286708; //0.225 * 0.8; 
-    ((UpdateController*)update_controller_pid_roll)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.kd = 0.0489; //0.042464; //0.0931; //0.056559; //0.04 * 0.8;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.dt = 1.f/200.f;
-    ((UpdateController*)update_controller_pid_roll)->pid_data.id = block_id::PID_ROLL;
-
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.kp = 0.2506;// 0.3360; //0.2811;//0.275252; //0.225 * 0.8; 
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.kd =  0.0578;//0.0684; //0.053100; //0.0868;// 0.051266; //0.04 * 0.8; 
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.dt = 1.f/200.f;
-    ((UpdateController*)update_controller_pid_pitch)->pid_data.id = block_id::PID_PITCH;
-
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.kp = 1.6 * 2;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.kd = 0.0;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.dt = 1.f/120.f;
-    ((UpdateController*)update_controller_pid_yaw)->pid_data.id = block_id::PID_YAW;
-
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.kp = 0.16 * 2;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.ki = 0.0;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.kd = 0.0;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.kdd = 0.0;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.anti_windup = 0;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.en_pv_derivation = 1;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.dt = 1.f/200.f;
-    ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.id = block_id::PID_YAW_RATE;
-    #endif
-
-    #ifdef BIG_HEXA
     ((UpdateController*)update_controller_pid_x)->pid_data.kp = 0.6534;
     ((UpdateController*)update_controller_pid_x)->pid_data.ki = 0.0;
     ((UpdateController*)update_controller_pid_x)->pid_data.kd = 0.3831;
@@ -280,64 +210,80 @@ int main(int argc, char** argv) {
     ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.en_pv_derivation = 1;
     ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.dt = 1.f/200.f;
     ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.id = block_id::PID_YAW_RATE;
+
+    #ifdef Z_ONLY
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.beta = -0.73;
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.relay_amp = 0.1; //0.1;
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.bias = 0.0;
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.no_switch_delay_in_ms = 10.0;
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.num_of_peak_conf_samples=5;
+    ((UpdateController*)update_controller_mrft_z)->mrft_data.id = block_id::MRFT_Z;
     #endif
+    
 
     ((ResetController*)reset_z)->target_block = block_id::PID_Z;
 
     Wait wait_1s;
     wait_1s.wait_time_ms=1000;
 
+    Wait wait_3s;
+    wait_3s.wait_time_ms=3000;
+
+    Wait wait_7s;
+    wait_7s.wait_time_ms=7000;
+
     Wait wait_100ms;
     wait_100ms.wait_time_ms=100;
-  
-    #ifdef TESTING
-    MissionPipeline testing_pipeline;
 
-    testing_pipeline.addElement((MissionElement*)&wait_1s);
+    MissionPipeline mrft_pipeline;
+
+    mrft_pipeline.addElement((MissionElement*)&wait_1s);
     
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_x);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_y);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_z);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_roll);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_pitch);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_yaw);
-    testing_pipeline.addElement((MissionElement*)update_controller_pid_yaw_rate);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_x);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_y);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_z);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_roll);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_pitch);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_yaw);
+    mrft_pipeline.addElement((MissionElement*)update_controller_pid_yaw_rate);
 
-    testing_pipeline.addElement((MissionElement*)set_height_offset); //TODO: (CHECK Desc) Set a constant height command/reference based on the current pos
-    testing_pipeline.addElement((MissionElement*)&wait_1s);
-    testing_pipeline.addElement((MissionElement*)set_restricted_norm_settings);
-    testing_pipeline.addElement((MissionElement*)initial_pose_waypoint);
-    testing_pipeline.addElement((MissionElement*)user_command);
-    testing_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
-    testing_pipeline.addElement((MissionElement*)&wait_100ms);
-    testing_pipeline.addElement((MissionElement*)arm_motors);
-    testing_pipeline.addElement((MissionElement*)user_command);
-    testing_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
-    testing_pipeline.addElement((MissionElement*)takeoff_relative_waypoint);
-    testing_pipeline.addElement((MissionElement*)user_command);
-    // testing_pipeline.addElement((MissionElement*)waypoint_set_rest_norm_settings);   
-    // testing_pipeline.addElement((MissionElement*)&wait_100ms);
-    // testing_pipeline.addElement((MissionElement*)absolute_origin_1m_height);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_1);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_2);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_3);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_4);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_5);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_6);
-    // testing_pipeline.addElement((MissionElement*)absolute_waypoint_square_7);
-    // testing_pipeline.addElement((MissionElement*)user_command);
-    testing_pipeline.addElement((MissionElement*)land_set_rest_norm_settings);   
-    testing_pipeline.addElement((MissionElement*)&wait_100ms);
-    testing_pipeline.addElement((MissionElement*)land_relative_waypoint);
+    #ifdef Z_ONLY
+    mrft_pipeline.addElement((MissionElement*)update_controller_mrft_z);
     #endif
+
+    mrft_pipeline.addElement((MissionElement*)set_height_offset); //TODO: (CHECK Desc) Set a constant height command/reference based on the current pos
+    mrft_pipeline.addElement((MissionElement*)&wait_1s);
+    mrft_pipeline.addElement((MissionElement*)set_restricted_norm_settings);
+    mrft_pipeline.addElement((MissionElement*)initial_pose_waypoint);
+    mrft_pipeline.addElement((MissionElement*)user_command);
+    mrft_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
+    mrft_pipeline.addElement((MissionElement*)&wait_100ms);
+    mrft_pipeline.addElement((MissionElement*)arm_motors);
+    mrft_pipeline.addElement((MissionElement*)user_command);
+    mrft_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
+    mrft_pipeline.addElement((MissionElement*)takeoff_relative_waypoint);
+    mrft_pipeline.addElement((MissionElement*)user_command);
+
+    #ifdef Z_ONLY
+    mrft_pipeline.addElement((MissionElement*)pid_to_mrft_switch_z);
+    #endif
+
+    mrft_pipeline.addElement((MissionElement*)user_command);  
+    mrft_pipeline.addElement((MissionElement*)initial_pose_waypoint);
+
+    #ifdef Z_ONLY
+    mrft_pipeline.addElement((MissionElement*)mrft_to_pid_switch_z);
+    #endif 
+    
+    mrft_pipeline.addElement((MissionElement*)user_command);
+    mrft_pipeline.addElement((MissionElement*)land_set_rest_norm_settings);   
+    mrft_pipeline.addElement((MissionElement*)&wait_100ms);
+    mrft_pipeline.addElement((MissionElement*)land_relative_waypoint);
 
     Logger::getAssignedLogger()->log("FlightScenario main_scenario",LoggerLevel::Info);
     MissionScenario main_scenario;
 
-    #ifdef TESTING
-    main_scenario.AddMissionPipeline(&testing_pipeline);
-    #endif
-
+    main_scenario.AddMissionPipeline(&mrft_pipeline);
     main_scenario.StartScenario();
     Logger::getAssignedLogger()->log("Main Done",LoggerLevel::Info);
     std::cout << "OK \n";

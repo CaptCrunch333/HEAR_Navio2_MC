@@ -22,5 +22,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(mc_example_node example_node/example_node.cpp)
+add_executable(mc_example_node example_node/mc_example_node.cpp)
+
 target_link_libraries(mc_example_node ${catkin_LIBRARIES})

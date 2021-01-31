@@ -16,17 +16,12 @@
 #include "HEAR_mission/SetAbsoluteWaypoint.hpp"
 #include "HEAR_mission/UpdateController.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_UpdateControllerClnt.hpp"
-#include "HEAR_math/ConstantFloat.hpp"
-#include "HEAR_ROS_BRIDGE/ROSUnit_UpdateControllerSrv.hpp"
 #include "HEAR_control/PIDController.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_InfoSubscriber.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_Factory.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_RestNormSettingsClnt.hpp"
-#include "HEAR_ROS_BRIDGE/ROSUnit_ControlOutputSubscriber.hpp"
 
-
-#undef Z_ONLY
-#define X_ONLY
+#define Z_ONLY
 
 
 int main(int argc, char** argv) {
@@ -44,28 +39,11 @@ int main(int argc, char** argv) {
     ROSUnit* ros_arm_srv = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
                                                             ROSUnit_msg_type::ROSUnit_Bool, 
                                                             "arm");
-    #ifdef X_ONLY
-    ROSUnit* ros_optitrack_mrft_switch_x = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
-                                                                      ROSUnit_msg_type::ROSUnit_Float,
-                                                                      "optitrack_mrft_switch_x");
-    ROSUnit* ros_camera_mrft_switch_x = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
-                                                                      ROSUnit_msg_type::ROSUnit_Float,
-                                                                      "camera_mrft_switch_x");
-    ROSUnit* ros_camera_pid_switch_x = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
-                                                                      ROSUnit_msg_type::ROSUnit_Float,
-                                                                      "camera_pid_switch_x");
-    #endif
 
     #ifdef Z_ONLY
     ROSUnit* ros_optitrack_mrft_switch_z = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
                                                                       ROSUnit_msg_type::ROSUnit_Float,
                                                                       "optitrack_mrft_switch_z");
-    ROSUnit* ros_camera_mrft_switch_z = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
-                                                                      ROSUnit_msg_type::ROSUnit_Float,
-                                                                      "camera_mrft_switch_z");
-    ROSUnit* ros_camera_pid_switch_z = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Client,
-                                                                      ROSUnit_msg_type::ROSUnit_Float,
-                                                                      "camera_pid_switch_z");
     #endif
 
     ROSUnit* ros_pos_sub = ROSUnit_Factory_main.CreateROSUnit(ROSUnit_tx_rx_type::Subscriber,
@@ -95,12 +73,6 @@ int main(int argc, char** argv) {
     MissionElement* update_controller_pid_pitch = new UpdateController();
     MissionElement* update_controller_pid_yaw = new UpdateController();
     MissionElement* update_controller_pid_yaw_rate = new UpdateController();
-
-    #ifdef X_ONLY
-    MissionElement* update_controller_mrft_x = new UpdateController();
-    MissionElement* pid_to_mrft_switch_x=new SwitchTrigger(3);
-    MissionElement* mrft_to_pid_switch_x=new SwitchTrigger(1);
-    #endif
 
     #ifdef Z_ONLY
     MissionElement* update_controller_mrft_z = new UpdateController();
@@ -138,18 +110,9 @@ int main(int argc, char** argv) {
     update_controller_pid_yaw->getPorts()[(int)UpdateController::ports_id::OP_0]->connect((ros_updt_ctr)->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_0_PID]);
     update_controller_pid_yaw_rate->getPorts()[(int)UpdateController::ports_id::OP_0]->connect((ros_updt_ctr)->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_0_PID]);
 
-    #ifdef X_ONLY
-    update_controller_mrft_x->getPorts()[(int)UpdateController::ports_id::OP_0]->connect(ros_updt_ctr->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_1_MRFT]);
-    pid_to_mrft_switch_x->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_x)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
-   
-    mrft_to_pid_switch_x->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_x)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
-    
-    #endif
-
     #ifdef Z_ONLY
     update_controller_mrft_z->getPorts()[(int)UpdateController::ports_id::OP_0]->connect(ros_updt_ctr->getPorts()[(int)ROSUnit_UpdateControllerClnt::ports_id::IP_1_MRFT]);
     pid_to_mrft_switch_z->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_z)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
-  
     mrft_to_pid_switch_z->getPorts()[(int)SwitchTrigger::ports_id::OP_0]->connect((ros_optitrack_mrft_switch_z)->getPorts()[(int)ROSUnit_SetFloatClnt::ports_id::IP_0]);
  
     #endif
@@ -248,15 +211,6 @@ int main(int argc, char** argv) {
     ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.dt = 1.f/200.f;
     ((UpdateController*)update_controller_pid_yaw_rate)->pid_data.id = block_id::PID_YAW_RATE;
 
-    #ifdef X_ONLY
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.beta = -0.73;
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.relay_amp = 0.20;
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.bias = 0.0;
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.no_switch_delay_in_ms = 100.0;
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.num_of_peak_conf_samples=7;
-    ((UpdateController*)update_controller_mrft_x)->mrft_data.id = block_id::MRFT_X;
-    #endif
-
     #ifdef Z_ONLY
     ((UpdateController*)update_controller_mrft_z)->mrft_data.beta = -0.73;
     ((UpdateController*)update_controller_mrft_z)->mrft_data.relay_amp = 0.1; //0.1;
@@ -281,9 +235,6 @@ int main(int argc, char** argv) {
     Wait wait_100ms;
     wait_100ms.wait_time_ms=100;
 
-
-
-
     MissionPipeline mrft_pipeline;
 
     mrft_pipeline.addElement((MissionElement*)&wait_1s);
@@ -300,10 +251,6 @@ int main(int argc, char** argv) {
     mrft_pipeline.addElement((MissionElement*)update_controller_mrft_z);
     #endif
 
-    #ifdef X_ONLY
-    mrft_pipeline.addElement((MissionElement*)update_controller_mrft_x);
-    #endif
-
     mrft_pipeline.addElement((MissionElement*)set_height_offset); //TODO: (CHECK Desc) Set a constant height command/reference based on the current pos
     mrft_pipeline.addElement((MissionElement*)&wait_1s);
     mrft_pipeline.addElement((MissionElement*)set_restricted_norm_settings);
@@ -312,43 +259,29 @@ int main(int argc, char** argv) {
     mrft_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
     mrft_pipeline.addElement((MissionElement*)&wait_100ms);
     mrft_pipeline.addElement((MissionElement*)arm_motors);
-    //mrft_pipeline.addElement((MissionElement*)&wait_3s);
     mrft_pipeline.addElement((MissionElement*)user_command);
     mrft_pipeline.addElement((MissionElement*)reset_z); //Reset I-term to zero
     mrft_pipeline.addElement((MissionElement*)takeoff_relative_waypoint);
-    //mrft_pipeline.addElement((MissionElement*)&wait_1s);
     mrft_pipeline.addElement((MissionElement*)user_command);
 
     #ifdef Z_ONLY
     mrft_pipeline.addElement((MissionElement*)pid_to_mrft_switch_z);
     #endif
 
-    #ifdef X_ONLY
-    mrft_pipeline.addElement((MissionElement*)pid_to_mrft_switch_x);
-    #endif
-
-    //mrft_pipeline.addElement((MissionElement*)&wait_7s);
     mrft_pipeline.addElement((MissionElement*)user_command);  
     mrft_pipeline.addElement((MissionElement*)initial_pose_waypoint);
 
     #ifdef Z_ONLY
     mrft_pipeline.addElement((MissionElement*)mrft_to_pid_switch_z);
     #endif 
-
-    #ifdef X_ONLY
-    mrft_pipeline.addElement((MissionElement*)mrft_to_pid_switch_x);
-    #endif 
     
-    //mrft_pipeline.addElement((MissionElement*)&wait_1s);
     mrft_pipeline.addElement((MissionElement*)user_command);
     mrft_pipeline.addElement((MissionElement*)land_set_rest_norm_settings);   
     mrft_pipeline.addElement((MissionElement*)&wait_100ms);
     mrft_pipeline.addElement((MissionElement*)land_relative_waypoint);
 
-
     Logger::getAssignedLogger()->log("FlightScenario main_scenario",LoggerLevel::Info);
     MissionScenario main_scenario;
-
 
     main_scenario.AddMissionPipeline(&mrft_pipeline);
     main_scenario.StartScenario();

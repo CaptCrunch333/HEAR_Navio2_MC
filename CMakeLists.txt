@@ -24,12 +24,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(mc_test_node example_node/test_node.cpp)
-add_executable(mc_optitrack_mrft_node example_node/optitrack_mrft_node.cpp)
-add_executable(mc_camera_mrft_node example_node/camera_mrft_node.cpp)
-add_executable(mc_translation_node example_node/traslation_node.cpp)
+add_executable(mc_example_node example_node/mc_example_node.cpp)
 
-target_link_libraries(mc_test_node ${catkin_LIBRARIES})
-target_link_libraries(mc_optitrack_mrft_node ${catkin_LIBRARIES})
-target_link_libraries(mc_camera_mrft_node ${catkin_LIBRARIES})
-target_link_libraries(mc_translation_node ${catkin_LIBRARIES})
+target_link_libraries(mc_example_node ${catkin_LIBRARIES})

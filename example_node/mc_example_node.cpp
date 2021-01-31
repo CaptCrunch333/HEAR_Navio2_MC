@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "HEAR_core/std_logger.hpp"
+#include "HEAR_control/PIDController.hpp"
 #include "HEAR_mission/Wait.hpp"
 #include "HEAR_mission/WaitForCondition.hpp"
 #include "HEAR_mission/Arm.hpp"
@@ -16,13 +17,11 @@
 #include "HEAR_mission/SetAbsoluteWaypoint.hpp"
 #include "HEAR_mission/UpdateController.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_UpdateControllerClnt.hpp"
-#include "HEAR_control/PIDController.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_InfoSubscriber.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_Factory.hpp"
 #include "HEAR_ROS_BRIDGE/ROSUnit_RestNormSettingsClnt.hpp"
 
 #define Z_ONLY
-
 
 int main(int argc, char** argv) {
     Logger::assignLogger(new StdLogger());
